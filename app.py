@@ -1,8 +1,6 @@
 import gradio as gr
 import json
-import os # We need this to read environment variables
 
-# The dummy plan function remains the same.
 def generate_dummy_plan(user_prompt):
     print(f"Received prompt from user: {user_prompt}") 
     dummy_plan = [
@@ -12,13 +10,14 @@ def generate_dummy_plan(user_prompt):
     ]
     return json.dumps(dummy_plan, indent=2)
 
-# The Gradio interface remains the same.
-demo = gr.Interface(
+# We define the interface and assign it to the variable 'app'.
+# This is what Gunicorn will look for.
+app = gr.Interface(
     fn=generate_dummy_plan,
     inputs=[gr.Textbox(label="User Prompt", lines=4)],
     outputs=[gr.Textbox(label="Generated JSON Output", lines=15)],
     title="Project Nexus - Test Backend (on Render)"
 )
 
-# THE FIX: This launch command is designed to work on Render with this specific architecture.
-demo.launch(server_name="0.0.0.0", server_port=int(os.environ.get('PORT', 7860)))
+# NOTE: There is NO app.launch() or demo.launch() command.
+# The script defines the app and then finishes. Gunicorn handles the rest.
