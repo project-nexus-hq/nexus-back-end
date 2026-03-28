@@ -1,25 +1,30 @@
-import gradio as gr
-import json
+from flask import Flask, jsonify
+import os
 
-def generate_dummy_plan(user_prompt):
-    print(f"Received prompt from user: {user_prompt}") 
+# Create the Flask application object
+app = Flask(__name__)
+
+# This is the test API endpoint that your JavaScript will call.
+@app.route('/run/predict', methods=['POST'])
+def predict():
+    print("API endpoint /run/predict was successfully hit!")
+    
+    # We will return the same dummy JSON data as before.
     dummy_plan = [
-        {"step_number": 1, "title": "CompTIA Network+ Certification", "justification": "This is the foundational step.", "url": "https://www.comptia.org/certifications/network"},
-        {"step_number": 2, "title": "Introduction to Python for Automation", "justification": "Learning a scripting language is critical.", "url": "https://www.udemy.com/course/python-for-network-engineers/"},
-        {"step_number": 3, "title": "Hands-On Red Team Tactics", "justification": "Now you can begin to apply offensive security techniques.", "url": "https://www.oreilly.com/library/view/red-team-development/9781492044369/"}
+        {"step_number": 1, "title": "CompTIA Network+ Certification (from Flask)", "justification": "This response proves the Flask backend is working.", "url": "https://www.comptia.org/certifications/network"},
+        {"step_number": 2, "title": "Introduction to Python for Automation", "justification": "This confirms the connection is successful.", "url": "https://www.udemy.com/course/python-for-network-engineers/"}
     ]
-    return json.dumps(dummy_plan, indent=2)
+    
+    # jsonify is Flask's way of creating a proper JSON response.
+    return jsonify(dummy_plan)
 
-# THE ONLY CHANGE: Remove the square brackets [] from inputs and outputs.
-app = gr.Interface(
-    fn=generate_dummy_plan,
-    inputs=gr.Textbox(label="User Prompt", lines=4),
-    outputs=gr.Textbox(label="Generated JSON Output", lines=15),
-    title="Project Nexus - Test Backend (on Render)"
-)
+# This is a simple "health check" endpoint.
+@app.route('/')
+def status():
+    return "Flask server is alive and running!"
 
-# forcing redeploy
-
-# This block allows Gunicorn to find and run the Gradio app.
+# This block is only used for local testing, not by Gunicorn.
 if __name__ == "__main__":
-    app.launch()
+    # We read the port from the environment, defaulting to 5000 for local dev
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
