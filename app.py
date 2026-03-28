@@ -9,7 +9,9 @@ CORS(app, resources={r"/*": {"origins": "*"}})
 # This is the test API endpoint
 @app.route('/run/predict', methods=['POST'])
 def predict():
-    print("API endpoint /run/predict was successfully hit!")
+    data = request.get_json()
+    user_prompt = data.get('prompt')
+    print(f"API endpoint was hit with promt: {user_prompt}")
     
     dummy_plan = [
         {"step_number": 1, "title": "CompTIA Network+ Certification (from Flask)", "justification": "This response proves the Flask backend is working.", "url": "https://www.comptia.org/certifications/network"},
@@ -21,7 +23,7 @@ def predict():
 # This is a simple "health check" endpoint
 @app.route('/')
 def status():
-    return "Flask server is alive and running with CORS enabled!"
+    return "Flask server is alive and running with explicit, permissive CORS enabled!"
 
 # This block is only used for local testing
 if __name__ == "__main__":
