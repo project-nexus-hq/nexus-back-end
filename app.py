@@ -1,10 +1,10 @@
 from flask import Flask, jsonify
-from flask_cors import CORS  # <--- CHANGE 1: Import the CORS library
+from flask_cors import CORS
 import os
 
 # Create the Flask application object
 app = Flask(__name__)
-CORS(app)  # <--- CHANGE 2: Enable CORS for the entire app
+CORS(app, resources={r"/run/*": {"origins": "*"}})
 
 # This is the test API endpoint
 @app.route('/run/predict', methods=['POST'])
