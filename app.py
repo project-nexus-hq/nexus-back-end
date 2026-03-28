@@ -7,7 +7,7 @@ app = Flask(__name__)
 CORS(app)
 
 # This is the test API endpoint
-@app.route('/run/predict', methods=['POST', 'OPTIONS'])
+@app.route('/')
 def predict():
     if request.method == 'OPTIONS':
         return '', 204 # A standard, empty success response for pre-flight.
