@@ -9,9 +9,6 @@ CORS(app)
 # This is the test API endpoint
 @app.route('/')
 def predict():
-    if request.method == 'OPTIONS':
-        return '', 204 # A standard, empty success response for pre-flight.
-    
     data = request.get_json()
     user_prompt = data.get('prompt')
     print(f"API endpoint was hit with promt: {user_prompt}")
