@@ -10,14 +10,14 @@ def generate_dummy_plan(user_prompt):
     ]
     return json.dumps(dummy_plan, indent=2)
 
-# We define the interface and assign it to the variable 'app'.
-# This is what Gunicorn will look for.
+# THE ONLY CHANGE: Remove the square brackets [] from inputs and outputs.
 app = gr.Interface(
     fn=generate_dummy_plan,
-    inputs=[gr.Textbox(label="User Prompt", lines=4)],
-    outputs=[gr.Textbox(label="Generated JSON Output", lines=15)],
+    inputs=gr.Textbox(label="User Prompt", lines=4),
+    outputs=gr.Textbox(label="Generated JSON Output", lines=15),
     title="Project Nexus - Test Backend (on Render)"
 )
 
-# NOTE: There is NO app.launch() or demo.launch() command.
-# The script defines the app and then finishes. Gunicorn handles the rest.
+# This block allows Gunicorn to find and run the Gradio app.
+if __name__ == "__main__":
+    app.launch()
