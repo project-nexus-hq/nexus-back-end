@@ -4,7 +4,7 @@ import os
 
 # Create the Flask application object
 app = Flask(__name__)
-CORS(app, resources={r"/run/*": {"origins": "*"}})
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 # This is the test API endpoint
 @app.route('/run/predict', methods=['POST'])
