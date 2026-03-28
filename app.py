@@ -4,11 +4,14 @@ import os
 
 # Create the Flask application object
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "*"}})
+CORS(app)
 
 # This is the test API endpoint
-@app.route('/run/predict', methods=['POST'])
+@app.route('/run/predict', methods=['POST', 'OPTIONS'])
 def predict():
+    if request.method == 'OPTIONS':
+        return '', 204 # A standard, empty success response for pre-flight.
+    
     data = request.get_json()
     user_prompt = data.get('prompt')
     print(f"API endpoint was hit with promt: {user_prompt}")
@@ -23,7 +26,7 @@ def predict():
 # This is a simple "health check" endpoint
 @app.route('/')
 def status():
-    return "Flask server is alive and running with explicit, permissive CORS enabled!"
+    return "Flask server is alive and running with OPTIONS enabled!"
 
 # This block is only used for local testing
 if __name__ == "__main__":
