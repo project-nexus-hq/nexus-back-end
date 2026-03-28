@@ -7,7 +7,7 @@ app = Flask(__name__)
 CORS(app)
 
 # This is the test API endpoint
-@app.route('/')
+@app.route('/run/predict')
 def predict():
     data = request.get_json()
     user_prompt = data.get('prompt')
