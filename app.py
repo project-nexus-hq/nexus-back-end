@@ -1,17 +1,19 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 import os
 
 # Create the Flask application object
 app = Flask(__name__)
-CORS(app)
+
+# Explicitly allow your GitHub Pages origin
+CORS(app, origins=["https://project-nexus-hq.github.io"])
 
 # This is the test API endpoint
-@app.route('/run/predict')
+@app.route('/run/predict', methods=['POST', 'OPTIONS'])
 def predict():
     data = request.get_json()
     user_prompt = data.get('prompt')
-    print(f"API endpoint was hit with promt: {user_prompt}")
+    print(f"API endpoint was hit with prompt: {user_prompt}")
     
     dummy_plan = [
         {"step_number": 1, "title": "CompTIA Network+ Certification (from Flask)", "justification": "This response proves the Flask backend is working.", "url": "https://www.comptia.org/certifications/network"},
