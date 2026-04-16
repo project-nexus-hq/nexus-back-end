@@ -1,31 +1,17 @@
 from flask import Flask, jsonify, request, make_response
-import anthropic
+import google.generativeai as genai
 import json
 import os
-
 from flask_cors import CORS
 
 app = Flask(__name__)
 CORS(app, origins=["https://project-nexus-hq.github.io"])
 
-client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
 
-@app.route('/run/predict', methods=['POST', 'OPTIONS'])
-def predict():
-    if request.method == 'OPTIONS':
-        response = make_response()
-        response.headers['Access-Control-Allow-Origin'] = 'https://project-nexus-hq.github.io'
-        response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
-        response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
-        return response, 200
-
-    data = request.get_json()
-    user_prompt = data.get('prompt')
-
-    message = client.messages.create(
-        model="claude-opus-4-5",
-        max_tokens=2048,
-        system="""You are a DAF (Department of the Air Force) cyber career advisor. 
+model = genai.GenerativeModel(
+    model_name="gemini-2.0-flash",
+    system_instruction="""You are a DAF (Department of the Air Force) cyber career advisor.
 Your job is to generate personalized, realistic training plans for cyber operators.
 
 When given a user's current role and career goal, respond ONLY with a valid JSON array.
@@ -40,23 +26,32 @@ Prioritize resources in this order:
 2. Industry certifications relevant to DoD work (CompTIA, SANS/GIAC, ISC2, Offensive Security)
 3. Reputable free platforms (TryHackMe, HackTheBox, Cybrary, NICCS)
 
-Generate between 5 and 7 steps. Output only the JSON array with no markdown, no explanation, no preamble.""",
-        messages=[
-            {"role": "user", "content": user_prompt}
-        ]
-    )
+Generate between 5 and 7 steps. Output only the JSON array with no markdown, no explanation, no preamble."""
+)
 
-    raw_text = message.content[0].text
+@app.route('/run/predict', methods=['POST', 'OPTIONS'])
+def predict():
+    if request.method == 'OPTIONS':
+        response = make_response()
+        response.headers['Access-Control-Allow-Origin'] = 'https://project-nexus-hq.github.io'
+        response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+        return response, 200
 
-    # Strip markdown code fences if Claude includes them despite instructions
-    cleaned = raw_text.strip()
-    if cleaned.startswith("```"):
-        cleaned = cleaned.split("```")[1]
-        if cleaned.startswith("json"):
-            cleaned = cleaned[4:]
-        cleaned = cleaned.strip()
+    data = request.get_json()
+    user_prompt = data.get('prompt')
 
-    plan = json.loads(cleaned)
+    response = model.generate_content(user_prompt)
+    raw_text = response.text.strip()
+
+    # Strip markdown code fences if the model includes them despite instructions
+    if raw_text.startswith("```"):
+        raw_text = raw_text.split("```")[1]
+        if raw_text.startswith("json"):
+            raw_text = raw_text[4:]
+        raw_text = raw_text.strip()
+
+    plan = json.loads(raw_text)
     return jsonify(plan)
 
 @app.route('/')
