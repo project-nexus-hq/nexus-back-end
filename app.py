@@ -1,5 +1,5 @@
 from flask import Flask, jsonify, request, make_response
-import google.generativeai as genai
+from groq import Groq
 import json
 import os
 from flask_cors import CORS
@@ -7,11 +7,9 @@ from flask_cors import CORS
 app = Flask(__name__)
 CORS(app, origins=["https://project-nexus-hq.github.io"])
 
-genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
+client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 
-model = genai.GenerativeModel(
-    model_name="gemini-2.0-flash",
-    system_instruction="""You are a DAF (Department of the Air Force) cyber career advisor.
+SYSTEM_PROMPT = """You are a DAF (Department of the Air Force) cyber career advisor.
 Your job is to generate personalized, realistic training plans for cyber operators.
 
 When given a user's current role and career goal, respond ONLY with a valid JSON array.
@@ -27,7 +25,6 @@ Prioritize resources in this order:
 3. Reputable free platforms (TryHackMe, HackTheBox, Cybrary, NICCS)
 
 Generate between 5 and 7 steps. Output only the JSON array with no markdown, no explanation, no preamble."""
-)
 
 @app.route('/run/predict', methods=['POST', 'OPTIONS'])
 def predict():
@@ -41,17 +38,26 @@ def predict():
     data = request.get_json()
     user_prompt = data.get('prompt')
 
-    response = model.generate_content(user_prompt)
-    raw_text = response.text.strip()
+    completion = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": user_prompt}
+        ],
+        temperature=0.7,
+        max_tokens=2048,
+        response_format={"type": "json_object"}  # Groq's JSON mode — cleaner than string parsing
+    )
 
-    # Strip markdown code fences if the model includes them despite instructions
-    if raw_text.startswith("```"):
-        raw_text = raw_text.split("```")[1]
-        if raw_text.startswith("json"):
-            raw_text = raw_text[4:]
-        raw_text = raw_text.strip()
+    raw_text = completion.choices[0].message.content.strip()
+    parsed = json.loads(raw_text)
 
-    plan = json.loads(raw_text)
+    # Groq's json_object mode wraps arrays in an object — unwrap if needed
+    if isinstance(parsed, dict):
+        plan = next(iter(parsed.values()))
+    else:
+        plan = parsed
+
     return jsonify(plan)
 
 @app.route('/')
