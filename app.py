@@ -75,43 +75,8 @@ Resource priority order:
 2. Reputable free platforms: TryHackMe, HackTheBox, Cybrary, Cisco NetAcad, vendor labs
 3. Free cert prep alternatives to paid bootcamps
 
-Generate no more than 7 steps. Only include what is directly relevant.
+Generate no more than 7 steps. Only include what is directly relevant."""
 
-=== RESPONSE FORMAT ===
-
-Respond ONLY with a valid JSON object (not an array) with this exact structure:
-
-{
-  "gap_analysis": {
-    "current_strengths": ["...", "..."],
-    "critical_gaps": ["...", "..."],
-    "estimated_timeline": "..."
-  },
-  "plan": [
-    {
-      "step_number": 1,
-      "title": "...",
-      "justification": "...",
-      "dod_8140_relevance": "...",
-      "af_cool_eligible": true or false,
-      "af_cool_url": "https://afcool.us.af.mil/ or null",
-      "url": "...",
-      "access_instructions": "..."
-    }
-  ]
-}
-
-Field definitions:
-- "step_number": integer starting at 1
-- "title": name of the certification, course, or resource
-- "justification": 2–3 sentences on why this step matters for their specific goal AND how it benefits DAF cyber personnel or translates to civilian IT
-- "dod_8140_relevance": 1 sentence on how this step maps to a DoD 8140 Work Role or IAT/IAM level; use "N/A" if not applicable
-- "af_cool_eligible": boolean — true only if the cert is on the AF COOL catalog
-- "af_cool_url": direct AF COOL cert URL if eligible, otherwise null
-- "url": real and accurate URL to the resource
-- "access_instructions": step-by-step instructions to access for free using military credentials, OR how to navigate to the course from the vendor homepage if the direct URL may break
-
-Output only the JSON object. No markdown, no explanation, no preamble."""
 
 @app.route('/run/predict', methods=['POST', 'OPTIONS'])
 def predict():
