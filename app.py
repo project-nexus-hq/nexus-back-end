@@ -9,9 +9,6 @@ CORS(app, origins=["https://project-nexus-hq.github.io"])
 
 client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 
-# ---------------------------------------------------------------------------
-# TRAINING PLAN SYSTEM PROMPT
-# ---------------------------------------------------------------------------
 SYSTEM_PROMPT = """You are a cyber career advisor with deep expertise in both the Department of the Air Force (DAF) and private sector IT/cybersecurity. You generate personalized, realistic training plans for cyber Airmen. Your priority is an iterative path of training and learning resources — not just certifications and degrees.
 
 === CRITICAL CONSTRAINTS & MILITARY ACCESS RULES ===
@@ -116,34 +113,6 @@ Field definitions:
 
 Output only the JSON object. No markdown, no explanation, no preamble."""
 
-# ---------------------------------------------------------------------------
-# EPR / EPB BULLET GENERATOR SYSTEM PROMPT
-# ---------------------------------------------------------------------------
-EPB_SYSTEM_PROMPT = """You are an expert Air Force EPR/EPB writer with 15+ years of experience writing performance reports for cyber Airmen (1B4, 1D7, 1N4, 17D, 17S officer series).
-
-When given a list of completed training steps and an Airman's role, generate 3 draft EPB/EPR bullets that:
-- Follow standard AF bullet format: Action verb — quantified impact — result/outcome
-- Use appropriate cyber-specific technical terminology an evaluator would recognize
-- Emphasize mission impact, professional development, and operational readiness
-- Include realistic but conservative estimated hours where relevant (only if not provided)
-- Are concise enough to fit on one line (under 210 characters preferred)
-- Sound authentic and earned — NOT generic or AI-obvious
-
-Respond ONLY with a valid JSON object:
-{
-  "bullets": [
-    "bullet text here",
-    "bullet text here",
-    "bullet text here"
-  ]
-}
-
-No markdown, no explanation, no preamble."""
-
-# ---------------------------------------------------------------------------
-# ROUTES
-# ---------------------------------------------------------------------------
-
 @app.route('/run/predict', methods=['POST', 'OPTIONS'])
 def predict():
     if request.method == 'OPTIONS':
@@ -163,63 +132,24 @@ def predict():
             {"role": "user", "content": user_prompt}
         ],
         temperature=0.7,
-        max_tokens=3072,
-        response_format={"type": "json_object"}
+        max_tokens=2048,
+        response_format={"type": "json_object"}  # Groq's JSON mode — cleaner than string parsing
     )
 
     raw_text = completion.choices[0].message.content.strip()
     parsed = json.loads(raw_text)
 
-    # Handle out-of-scope responses
-    if isinstance(parsed, dict) and parsed.get("out_of_scope"):
-        return jsonify(parsed)
+    # Groq's json_object mode wraps arrays in an object — unwrap if needed
+    if isinstance(parsed, dict):
+        plan = next(iter(parsed.values()))
+    else:
+        plan = parsed
 
-    # Normalize: some models may return the array directly or wrapped
-    if isinstance(parsed, list):
-        return jsonify({"plan": parsed, "gap_analysis": None})
-
-    return jsonify(parsed)
-
-
-@app.route('/run/epb', methods=['POST', 'OPTIONS'])
-def generate_epb():
-    if request.method == 'OPTIONS':
-        response = make_response()
-        response.headers['Access-Control-Allow-Origin'] = 'https://project-nexus-hq.github.io'
-        response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
-        response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
-        return response, 200
-
-    data = request.get_json()
-    role = data.get('role', 'Cyber Operator')
-    completed_steps = data.get('completed_steps', [])
-
-    steps_text = "\n".join(
-        [f"- {s.get('title', '')}: {s.get('justification', '')}" for s in completed_steps]
-    )
-
-    user_prompt = f"Role: {role}\n\nCompleted training:\n{steps_text}"
-
-    completion = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[
-            {"role": "system", "content": EPB_SYSTEM_PROMPT},
-            {"role": "user", "content": user_prompt}
-        ],
-        temperature=0.8,
-        max_tokens=1024,
-        response_format={"type": "json_object"}
-    )
-
-    raw_text = completion.choices[0].message.content.strip()
-    parsed = json.loads(raw_text)
-    return jsonify(parsed)
-
+    return jsonify(plan)
 
 @app.route('/')
 def status():
     return "Flask server is alive and running!"
-
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
