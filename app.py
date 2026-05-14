@@ -19,7 +19,12 @@ CRITICAL CONSTRAINTS & MILITARY ACCESS RULES:
 - SKILLSOFT / PERCIPIO: Do not send users to Skillsoft.com. The USAF instance is Percipio. Direct them to search for the course on the AF e-Learning/Percipio portal.
 - URL BREADCRUMBS: Provide the main root URL of the platform, and provide exact search terms rather than guessing deep-link URLs which often break.
 
-When you receive the user's current role and desired objective, consider the following:
+USER-PROVIDED CONSTRAINTS (THE SOURCE OF TRUTH):
+1. CLEARANCE: The user will provide their current clearance level. Do NOT suggest career goals or training that require a higher clearance unless you explicitly label it as "Requires Upgrade to [Level]."
+2. EXISTING CERTS: The user will list certifications they already possess. Do NOT include these as a step in the learning path.
+3. LOCAL SOPs: If unit-level context or an SOP is provided, prioritize the technical tasks and tools mentioned in that context over generic industry equivalents.
+
+When you receive the user's mission profile, consider the following:
 - How does this goal map to DoD 8140/8570 baselines, AFSC CFETP upgrade training, or specific DAF work roles (e.g., DCO, OCO, DoDIN ops)?
 - What DOD-funded resources (DigitalU, AF Percipio, MWR, FedVTE, JKO) can provide this training at no cost?
 - If no DOD-funded resources are available, what reputable free platforms (TryHackMe, HackTheBox, Cisco NetAcad) apply?
@@ -27,6 +32,7 @@ When you receive the user's current role and desired objective, consider the fol
 
 OUTPUT FORMAT:
 You must respond ONLY with a valid JSON object containing a single key called "learning_path". "learning_path" must be an array of objects. 
+
 Each object in the array must have exactly these keys:
 - "step_number": integer starting at 1
 - "title": string, the name of the certification, course, or training resource
@@ -46,10 +52,28 @@ def predict():
         return response, 200
 
     data = request.get_json()
-    if not data or 'prompt' not in data:
-        return jsonify({"error": "No prompt provided"}), 400
-
-    user_prompt = data.get('prompt')
+    
+    # Extract the new structured JSON payload from the frontend
+    mission_profile = data.get('missionProfile')
+    if not mission_profile:
+        # Fallback to legacy single prompt for backward compatibility during testing
+        user_prompt = data.get('prompt')
+        if not user_prompt:
+            return jsonify({"error": "No mission profile or prompt provided"}), 400
+    else:
+        # Construct a highly structured prompt from the JSON constraints
+        certs_held = ", ".join(mission_profile.get("currentCertifications", [])) or "None"
+        local_context = mission_profile.get("localContextSop", "None provided.")
+        
+        user_prompt = f"""
+        MISSION PROFILE OVERVIEW:
+        - Target Role / Goal: {mission_profile.get("strategicGoal", "Unspecified")} ({mission_profile.get("targetRoleType", "Unspecified")})
+        - Clearance Level: {mission_profile.get("clearanceLevel", "Unclassified")}
+        - Certifications Already Held: {certs_held}
+        - Unit Context / SOPs: {local_context}
+        
+        Please generate a learning path tailored strictly to these constraints.
+        """
 
     try:
         completion = client.chat.completions.create(
@@ -62,19 +86,19 @@ def predict():
             max_tokens=2048,
             response_format={"type": "json_object"} 
         )
-
+        
         raw_text = completion.choices[0].message.content.strip()
         
         # Parse the JSON explicitly
         parsed = json.loads(raw_text)
         
-        # We explicitly asked the LLM for a "learning_path" key, so we extract it cleanly
+        # Extract the learning_path key
         plan = parsed.get("learning_path", [])
         
         # Handle the Out of Scope edge case cleanly
         if not plan:
-            return jsonify([{"step_number": 1, "title": "Out of Scope", "justification": "Query unrelated to cyber operations."}])
-
+            return jsonify([{"step_number": 1, "title": "Out of Scope", "justification": "Query unrelated to cyber operations.", "platform_url": "", "access_instructions": ""}])
+        
         return jsonify(plan)
 
     except json.JSONDecodeError:
