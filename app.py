@@ -48,4 +48,63 @@ def predict():
         response = make_response()
         response.headers['Access-Control-Allow-Origin'] = 'https://project-nexus-hq.github.io'
         response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
-        response.headers['Access-Control-
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+        return response, 200
+
+    data = request.get_json()
+    
+    # NEW: Expecting chat history and the mission profile (clearance, etc.)
+    chat_history = data.get('chatHistory', [])
+    mission_profile = data.get('missionProfile', {})
+    
+    # 1. Build the AI's "Context" from the Mission Profile
+    profile_context = f"""
+    --- USER MISSION PROFILE ---
+    Current Clearance: {mission_profile.get('clearanceLevel', 'Unclassified')}
+    Certifications Held: {", ".join(mission_profile.get('currentCertifications', [])) or 'None'}
+    Unit Context: {mission_profile.get('localContextSop', 'None provided.')}
+    Strategic Goal: {mission_profile.get('strategicGoal', 'General Career Advice')}
+    """
+
+    # 2. Prepare the messages for the LLM
+    # We start with the System Instructions + the User's Profile Facts
+    messages = [{"role": "system", "content": f"{SYSTEM_PROMPT}\n\n{profile_context}"}]
+    
+    # 3. Add the actual conversation history
+    for msg in chat_history:
+        messages.append({"role": msg["role"], "content": msg["content"]})
+
+    try:
+        # Request a JSON response from Groq
+        completion = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=messages,
+            temperature=0.7,
+            max_tokens=2048,
+            response_format={"type": "json_object"} 
+        )
+        
+        raw_text = completion.choices[0].message.content.strip()
+        parsed_response = json.loads(raw_text)
+        
+        # Ensure the response has the required keys before sending to frontend
+        if "learning_path" not in parsed_response:
+            parsed_response["learning_path"] = []
+        if "assistant_message" not in parsed_response:
+            parsed_response["assistant_message"] = "I have updated your roadmap based on our conversation."
+
+        return jsonify(parsed_response)
+
+    except json.JSONDecodeError:
+        return jsonify({"error": "Failed to parse AI response."}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/')
+def status():
+    return "Project Nexus Command Server is Active."
+
+if __name__ == "__main__":
+    # Use the port assigned by the environment (e.g., Render or Heroku)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
