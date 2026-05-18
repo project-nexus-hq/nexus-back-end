@@ -6,13 +6,14 @@ from flask_cors import CORS
 
 app = Flask(__name__)
 
-# The "Nuclear Option" for CORS - Allows your frontend to talk to this backend
-CORS(app, resources={r"/*": {"origins": "*"}})
+# Allow your GitHub Pages frontend to communicate with this backend
+CORS(app, origins=["https://project-nexus-hq.github.io"])
 
+# Initialize Groq client using your environment variable
 client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 
 # =======================================================
-# PROMPT 1: STUDENT PORTAL - SENIOR CYBER MENTOR
+# PROMPT 1: STUDENT PORTAL - CAREER ADVISOR
 # =======================================================
 SYSTEM_PROMPT = """You are a Senior DAF Cyber Warfare Operations (1B4/1D7) Mentor and Technical Career Advisor. 
 
@@ -48,7 +49,7 @@ You must respond ONLY with a valid JSON object containing exactly two keys:
 Output only the JSON object. No preamble, no markdown."""
 
 # =======================================================
-# PROMPT 2: INSTRUCTOR PORTAL - CLOSED BOOK MTP TUTOR
+# PROMPT 2: INSTRUCTOR PORTAL - CLOSED BOOK REVIEWER
 # =======================================================
 MTP_TUTOR_PROMPT = """You are a strict Master Training Plan (MTP) Tutor and Curriculum Reviewer. You operate as a "Closed-Book" AI.
 
@@ -65,13 +66,31 @@ Respond ONLY with a valid JSON object containing one key:
 Output only the JSON object. No preamble, no markdown."""
 
 # =======================================================
+# PROMPT 3: TUTOR PORTAL - SOCRATIC LEARNING
+# =======================================================
+SOCRATIC_TUTOR_PROMPT = """You are a Socratic Military Cyber Instructor. Your mission is to help a student understand and complete the tasks listed in their uploaded unit training document.
+
+CRITICAL RULES:
+1. THE HYBRID APPROACH: You MUST use the uploaded document as your syllabus. However, you ARE permitted to use external technical knowledge to actually teach the tools and concepts mentioned in that document.
+2. NO DIRECT ANSWERS: If a student asks "How do I do X?", do NOT just give them the exact command or code. Instead, ask them a guiding question or explain the underlying concept so they figure it out themselves.
+3. STAY ON TARGET: If the student asks about a tool, framework, or concept that is NOT listed in the document, you must politely redirect them back to the tasks required by the document.
+4. TONE: Encouraging but firm, like a seasoned NCO mentoring an airman.
+
+OUTPUT FORMAT:
+Respond ONLY with a valid JSON object containing one key:
+1. "assistant_message": A string containing your Socratic response. Format with clear, readable spacing using HTML line breaks (<br><br>) for paragraphs.
+
+Output only the JSON object. No preamble, no markdown."""
+
+
+# =======================================================
 # ROUTE 1: STUDENT PORTAL (PREDICT)
 # =======================================================
 @app.route('/run/predict', methods=['POST', 'OPTIONS'])
 def predict():
     if request.method == 'OPTIONS':
         response = make_response()
-        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Origin'] = 'https://project-nexus-hq.github.io'
         response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
         response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
         return response, 200
@@ -96,11 +115,10 @@ def predict():
         completion = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=messages,
-            temperature=0.6, # Allows for slight creativity in roadmap generation
+            temperature=0.6,
             max_tokens=2048,
             response_format={"type": "json_object"} 
         )
-        
         raw_text = completion.choices[0].message.content.strip()
         parsed_response = json.loads(raw_text)
         
@@ -110,18 +128,18 @@ def predict():
             parsed_response["assistant_message"] = "I have updated your roadmap based on our conversation."
 
         return jsonify(parsed_response)
-
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
 # =======================================================
-# ROUTE 2: INSTRUCTOR PORTAL (CLOSED BOOK CHAT)
+# ROUTE 2: INSTRUCTOR PORTAL (CLOSED BOOK MTP)
 # =======================================================
 @app.route('/run/mtp_chat', methods=['POST', 'OPTIONS'])
 def mtp_chat():
     if request.method == 'OPTIONS':
         response = make_response()
-        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Origin'] = 'https://project-nexus-hq.github.io'
         response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
         response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
         return response, 200
@@ -133,7 +151,6 @@ def mtp_chat():
     if not mtp_content:
         return jsonify({"assistant_message": "Error: No document data found. Please ingest a document first."})
 
-    # The AI ONLY sees the closed-book prompt and the uploaded document text.
     messages = [{"role": "system", "content": f"{MTP_TUTOR_PROMPT}\n\n--- UPLOADED DOCUMENT ---\n{mtp_content}"}]
     
     for msg in chat_history:
@@ -143,19 +160,56 @@ def mtp_chat():
         completion = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=messages,
-            temperature=0.1, # EXTREMELY low temperature to prevent hallucinations
+            temperature=0.1,
             max_tokens=2048,
             response_format={"type": "json_object"} 
         )
-        
         raw_text = completion.choices[0].message.content.strip()
         return jsonify(json.loads(raw_text))
-
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
 # =======================================================
-# ROUTE 3: STATUS CHECK
+# ROUTE 3: TUTOR PORTAL (SOCRATIC LEARNING)
+# =======================================================
+@app.route('/run/tutor_chat', methods=['POST', 'OPTIONS'])
+def tutor_chat():
+    if request.method == 'OPTIONS':
+        response = make_response()
+        response.headers['Access-Control-Allow-Origin'] = 'https://project-nexus-hq.github.io'
+        response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+        return response, 200
+
+    data = request.get_json()
+    chat_history = data.get('chatHistory', [])
+    mtp_content = data.get('mtpData', '')
+
+    if not mtp_content:
+        return jsonify({"assistant_message": "Error: No training document found. Please load your syllabus first."})
+
+    messages = [{"role": "system", "content": f"{SOCRATIC_TUTOR_PROMPT}\n\n--- UPLOADED SYLLABUS ---\n{mtp_content}"}]
+    
+    for msg in chat_history:
+        messages.append({"role": msg["role"], "content": msg["content"]})
+
+    try:
+        completion = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=messages,
+            temperature=0.4, # Mid-level temp for Socratic creativity
+            max_tokens=2048,
+            response_format={"type": "json_object"} 
+        )
+        raw_text = completion.choices[0].message.content.strip()
+        return jsonify(json.loads(raw_text))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# =======================================================
+# STATUS
 # =======================================================
 @app.route('/')
 def status():
