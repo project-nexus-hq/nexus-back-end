@@ -6,14 +6,14 @@ from flask_cors import CORS
 
 app = Flask(__name__)
 
-# Allow your GitHub Pages frontend to communicate with this backend
-CORS(app, origins=["https://project-nexus-hq.github.io"])
+# The "Nuclear Option" for CORS - Allows your frontend to talk to this backend
+CORS(app, resources={r"/*": {"origins": "*"}})
 
-# Initialize Groq client using your environment variable
 client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 
-# --- THE SYSTEM BRAIN ---
-# This prompt ensures the AI follows DoD rules and returns structured data
+# =======================================================
+# PROMPT 1: STUDENT PORTAL - SENIOR CYBER MENTOR
+# =======================================================
 SYSTEM_PROMPT = """You are a Senior DAF Cyber Warfare Operations (1B4/1D7) Mentor and Technical Career Advisor. 
 
 MISSION: Generate highly tactical, zero-fluff, personalized training plans. You must evaluate the user's current skills and provide advanced, specific steps. NEVER give beginner advice to an experienced operator.
@@ -47,45 +47,56 @@ You must respond ONLY with a valid JSON object containing exactly two keys:
 
 Output only the JSON object. No preamble, no markdown."""
 
+# =======================================================
+# PROMPT 2: INSTRUCTOR PORTAL - CLOSED BOOK MTP TUTOR
+# =======================================================
+MTP_TUTOR_PROMPT = """You are a strict Master Training Plan (MTP) Tutor and Curriculum Reviewer. You operate as a "Closed-Book" AI.
+
+CRITICAL RULES:
+1. STRICT GROUNDING: You must base your answers STRICTLY and EXCLUSIVELY on the provided Document/MTP text. 
+2. NO OUTSIDE KNOWLEDGE: Do NOT use pre-trained knowledge, internet sources, or external training platforms UNLESS they are explicitly written in the provided document.
+3. INTERNAL REVIEW: If the user asks you to "review" or "critique" the document, you must evaluate it solely based on its own internal logic, clarity, structure, and measurability. Do not invent external standards.
+4. REFUSAL PROTOCOL: If the user asks a question that cannot be answered using the provided document, you MUST reply: "I cannot answer that based on the provided text." Do not guess or infer.
+
+OUTPUT FORMAT:
+Respond ONLY with a valid JSON object containing one key:
+1. "assistant_message": A string containing your answer based purely on the document text. Format with clear, readable spacing using HTML line breaks (<br><br>) for paragraphs.
+
+Output only the JSON object. No preamble, no markdown."""
+
+# =======================================================
+# ROUTE 1: STUDENT PORTAL (PREDICT)
+# =======================================================
 @app.route('/run/predict', methods=['POST', 'OPTIONS'])
 def predict():
-    # Handle the "Pre-flight" check for security (CORS)
     if request.method == 'OPTIONS':
         response = make_response()
-        response.headers['Access-Control-Allow-Origin'] = 'https://project-nexus-hq.github.io'
+        response.headers['Access-Control-Allow-Origin'] = '*'
         response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
         response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
         return response, 200
 
     data = request.get_json()
-    
-    # NEW: Expecting chat history and the mission profile (clearance, etc.)
     chat_history = data.get('chatHistory', [])
     mission_profile = data.get('missionProfile', {})
     
-    # 1. Build the AI's "Context" from the Mission Profile
     profile_context = f"""
     --- USER MISSION PROFILE ---
     Current Clearance: {mission_profile.get('clearanceLevel', 'Unclassified')}
     Certifications Held: {", ".join(mission_profile.get('currentCertifications', [])) or 'None'}
     Unit Context: {mission_profile.get('localContextSop', 'None provided.')}
-    Strategic Goal: {mission_profile.get('strategicGoal', 'General Career Advice')}
     """
 
-    # 2. Prepare the messages for the LLM
-    # We start with the System Instructions + the User's Profile Facts
     messages = [{"role": "system", "content": f"{SYSTEM_PROMPT}\n\n{profile_context}"}]
     
-    # 3. Add the actual conversation history
     for msg in chat_history:
         messages.append({"role": msg["role"], "content": msg["content"]})
 
     try:
-        # Request a JSON response from Groq
         completion = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=messages,
-            temperature=0.7,
+            temperature=0.6, # Allows for slight creativity in roadmap generation
             max_tokens=2048,
             response_format={"type": "json_object"} 
         )
@@ -93,7 +104,6 @@ def predict():
         raw_text = completion.choices[0].message.content.strip()
         parsed_response = json.loads(raw_text)
         
-        # Ensure the response has the required keys before sending to frontend
         if "learning_path" not in parsed_response:
             parsed_response["learning_path"] = []
         if "assistant_message" not in parsed_response:
@@ -101,16 +111,56 @@ def predict():
 
         return jsonify(parsed_response)
 
-    except json.JSONDecodeError:
-        return jsonify({"error": "Failed to parse AI response."}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# =======================================================
+# ROUTE 2: INSTRUCTOR PORTAL (CLOSED BOOK CHAT)
+# =======================================================
+@app.route('/run/mtp_chat', methods=['POST', 'OPTIONS'])
+def mtp_chat():
+    if request.method == 'OPTIONS':
+        response = make_response()
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+        return response, 200
+
+    data = request.get_json()
+    chat_history = data.get('chatHistory', [])
+    mtp_content = data.get('mtpData', '')
+
+    if not mtp_content:
+        return jsonify({"assistant_message": "Error: No document data found. Please ingest a document first."})
+
+    # The AI ONLY sees the closed-book prompt and the uploaded document text.
+    messages = [{"role": "system", "content": f"{MTP_TUTOR_PROMPT}\n\n--- UPLOADED DOCUMENT ---\n{mtp_content}"}]
+    
+    for msg in chat_history:
+        messages.append({"role": msg["role"], "content": msg["content"]})
+
+    try:
+        completion = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=messages,
+            temperature=0.1, # EXTREMELY low temperature to prevent hallucinations
+            max_tokens=2048,
+            response_format={"type": "json_object"} 
+        )
+        
+        raw_text = completion.choices[0].message.content.strip()
+        return jsonify(json.loads(raw_text))
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# =======================================================
+# ROUTE 3: STATUS CHECK
+# =======================================================
 @app.route('/')
 def status():
     return "Project Nexus Command Server is Active."
 
 if __name__ == "__main__":
-    # Use the port assigned by the environment (e.g., Render or Heroku)
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
