@@ -6,13 +6,14 @@ from flask_cors import CORS
 
 app = Flask(__name__)
 
-# Allow your GitHub Pages frontend to communicate with this backend (PRESERVED)
-CORS(app, origins=["https://project-nexus-hq.github.io"])
+# The "Nuclear Option" for CORS - Allows your frontend to talk to this backend
+CORS(app, resources={r"/*": {"origins": "*"}})
 
-# Initialize Groq client using your environment variable
 client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 
-# --- PROMPT 1: TRAINEE TACTICAL MENTOR ---
+# =======================================================
+# PROMPT 1: STUDENT PORTAL - SENIOR CYBER MENTOR
+# =======================================================
 SYSTEM_PROMPT = """You are a Senior DAF Cyber Warfare Operations (1B4/1D7) Mentor and Technical Career Advisor. 
 
 MISSION: Generate highly tactical, zero-fluff, personalized training plans. You must evaluate the user's current skills and provide advanced, specific steps. NEVER give beginner advice to an experienced operator.
@@ -25,14 +26,13 @@ CRITICAL ACCESS RULES:
 
 USER-PROVIDED CONSTRAINTS (THE SOURCE OF TRUTH):
 1. EXISTING CERTS: Do NOT include certifications the user already possesses in the roadmap.
-2. BASELINE ASSESSMENT: You MUST analyze the "Local Unit Context" to determine the user's current skill level. Start at their current level and push them forward.
+2. BASELINE ASSESSMENT: You MUST analyze the "Local Unit Context" to determine the user's current skill level. If they list experience with L2/L3 networking, AD, or enterprise IT, DO NOT recommend basic IT, Net+, or foundational networking. Start at their current level and push them forward.
 3. LOCAL SOPs: Prioritize the technical tasks/tools mentioned in provided unit documents.
-4. MASTER TRAINING PLAN (MTP): If an MTP is provided, your roadmap MUST directly align with the tasks, tools, and objectives listed in that document.
 
 MILESTONE SCALING & QUALITY RULES:
-- NO GENERIC TITLES: Titles must be highly specific technical objectives.
+- NO GENERIC TITLES: Titles must be highly specific technical objectives (e.g., "Master Python for OSINT" or "Complete HTB Defensive Track" instead of "Cybersecurity Fundamentals").
 - DO NOT PAD: Assess the complexity of the user's goal. Generate between 3 to 7 milestones accordingly. If a near-term goal requires 3 concrete steps, output exactly 3.
-- ADVANCED TRANSITIONS: Use 5 to 7 steps for complex transitions (like 1D7 to 1B4). Every single step MUST have a direct, actionable technical requirement.
+- ADVANCED TRANSITIONS: Use 5 to 7 steps for complex transitions (like 1D7 to 1B4). Every single step MUST have a direct, actionable technical requirement (e.g., OS internals, Python/C scripting, advanced DCO/OCO concepts, or EDPT preparation).
 - The last step should always be the final certification, assessment, or milestone required to achieve the goal.
 
 OUTPUT FORMAT:
@@ -41,59 +41,54 @@ You must respond ONLY with a valid JSON object containing exactly two keys:
 2. "learning_path": An array of objects. Each object must have:
    - "step_number": integer
    - "title": string (Highly specific and technical)
-   - "justification": string (2-3 sentences explaining exactly how this bridges the gap)
+   - "justification": string (2-3 sentences explaining exactly how this bridges the gap from their current skills to their goal, and its DoD 8140/DAF relevance)
    - "platform_url": string (ROOT URL)
    - "access_instructions": string (step-by-step for military users)
 
 Output only the JSON object. No preamble, no markdown."""
 
-# --- PROMPT 2: TRAINING CELL MTP REVIEWER ---
-MTP_REVIEW_PROMPT = """You are a DAF Senior Enlisted Leader and Master Unit Training Manager (UTM). 
-Your job is to review a provided Master Training Plan (MTP) or curriculum for a cyber unit.
+# =======================================================
+# PROMPT 2: INSTRUCTOR PORTAL - CLOSED BOOK MTP TUTOR
+# =======================================================
+MTP_TUTOR_PROMPT = """You are a strict Master Training Plan (MTP) Tutor and Curriculum Reviewer. You operate as a "Closed-Book" AI.
 
-Analyze the provided MTP text and generate a structured JSON critique. Look for:
-1. Alignment with modern DoD 8140/8570 baselines.
-2. Gaps in modern cyber warfare/defense tactics (e.g., missing cloud security, zero-trust, or automation/scripting).
-3. Clarity and progression logic.
+CRITICAL RULES:
+1. STRICT GROUNDING: You must base your answers STRICTLY and EXCLUSIVELY on the provided Document/MTP text. 
+2. NO OUTSIDE KNOWLEDGE: Do NOT use pre-trained knowledge, internet sources, or external training platforms UNLESS they are explicitly written in the provided document.
+3. INTERNAL REVIEW: If the user asks you to "review" or "critique" the document, you must evaluate it solely based on its own internal logic, clarity, structure, and measurability. Do not invent external standards.
+4. REFUSAL PROTOCOL: If the user asks a question that cannot be answered using the provided document, you MUST reply: "I cannot answer that based on the provided text." Do not guess or infer.
 
 OUTPUT FORMAT:
-Respond ONLY with a valid JSON object containing:
-1. "overall_assessment": string (1 paragraph summary of the MTP's quality)
-2. "identified_gaps": array of strings (list of missing skills or outdated tools)
-3. "recommendations": array of strings (actionable steps for the training cell to improve the curriculum)
-"""
+Respond ONLY with a valid JSON object containing one key:
+1. "assistant_message": A string containing your answer based purely on the document text. Format with clear, readable spacing using HTML line breaks (<br><br>) for paragraphs.
+
+Output only the JSON object. No preamble, no markdown."""
 
 # =======================================================
-# ROUTE 1: TRAINEE PREDICTION
+# ROUTE 1: STUDENT PORTAL (PREDICT)
 # =======================================================
 @app.route('/run/predict', methods=['POST', 'OPTIONS'])
 def predict():
-    # Handle the "Pre-flight" check for security (CORS PRESERVED)
     if request.method == 'OPTIONS':
         response = make_response()
-        response.headers['Access-Control-Allow-Origin'] = 'https://project-nexus-hq.github.io'
+        response.headers['Access-Control-Allow-Origin'] = '*'
         response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
         response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
         return response, 200
 
     data = request.get_json()
-    
     chat_history = data.get('chatHistory', [])
     mission_profile = data.get('missionProfile', {})
     
-    # 1. Build the AI's "Context"
     profile_context = f"""
     --- USER MISSION PROFILE ---
     Current Clearance: {mission_profile.get('clearanceLevel', 'Unclassified')}
     Certifications Held: {", ".join(mission_profile.get('currentCertifications', [])) or 'None'}
     Unit Context: {mission_profile.get('localContextSop', 'None provided.')}
-    Master Training Plan Data: {mission_profile.get('mtpData', 'No MTP provided.')}
     """
 
-    # 2. Prepare the messages for the LLM
     messages = [{"role": "system", "content": f"{SYSTEM_PROMPT}\n\n{profile_context}"}]
     
-    # 3. Add the actual conversation history
     for msg in chat_history:
         messages.append({"role": msg["role"], "content": msg["content"]})
 
@@ -101,7 +96,7 @@ def predict():
         completion = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=messages,
-            temperature=0.6,
+            temperature=0.6, # Allows for slight creativity in roadmap generation
             max_tokens=2048,
             response_format={"type": "json_object"} 
         )
@@ -113,54 +108,55 @@ def predict():
             parsed_response["learning_path"] = []
         if "assistant_message" not in parsed_response:
             parsed_response["assistant_message"] = "I have updated your roadmap based on our conversation."
-            
+
         return jsonify(parsed_response)
 
-    except json.JSONDecodeError:
-        return jsonify({"error": "Failed to parse AI response."}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 # =======================================================
-# ROUTE 2: TRAINING CELL MTP ANALYSIS (NEW)
+# ROUTE 2: INSTRUCTOR PORTAL (CLOSED BOOK CHAT)
 # =======================================================
-@app.route('/run/analyze_mtp', methods=['POST', 'OPTIONS'])
-def analyze_mtp():
-    # Exactly matching your CORS pre-flight block
+@app.route('/run/mtp_chat', methods=['POST', 'OPTIONS'])
+def mtp_chat():
     if request.method == 'OPTIONS':
         response = make_response()
-        response.headers['Access-Control-Allow-Origin'] = 'https://project-nexus-hq.github.io'
+        response.headers['Access-Control-Allow-Origin'] = '*'
         response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
         response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
         return response, 200
 
     data = request.get_json()
+    chat_history = data.get('chatHistory', [])
     mtp_content = data.get('mtpData', '')
 
     if not mtp_content:
-        return jsonify({"error": "No MTP data provided."}), 400
+        return jsonify({"assistant_message": "Error: No document data found. Please ingest a document first."})
 
-    user_prompt = f"Please review this Master Training Plan and provide your critique:\n\n{mtp_content}"
+    # The AI ONLY sees the closed-book prompt and the uploaded document text.
+    messages = [{"role": "system", "content": f"{MTP_TUTOR_PROMPT}\n\n--- UPLOADED DOCUMENT ---\n{mtp_content}"}]
+    
+    for msg in chat_history:
+        messages.append({"role": msg["role"], "content": msg["content"]})
 
     try:
         completion = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
-            messages=[
-                {"role": "system", "content": MTP_REVIEW_PROMPT},
-                {"role": "user", "content": user_prompt}
-            ],
-            temperature=0.4, # Lower temperature for analytical review
+            messages=messages,
+            temperature=0.1, # EXTREMELY low temperature to prevent hallucinations
             max_tokens=2048,
             response_format={"type": "json_object"} 
         )
         
         raw_text = completion.choices[0].message.content.strip()
-        parsed_response = json.loads(raw_text)
-        return jsonify(parsed_response)
+        return jsonify(json.loads(raw_text))
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# =======================================================
+# ROUTE 3: STATUS CHECK
+# =======================================================
 @app.route('/')
 def status():
     return "Project Nexus Command Server is Active."
