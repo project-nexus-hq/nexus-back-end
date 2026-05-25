@@ -33,7 +33,7 @@ USER-PROVIDED CONSTRAINTS (THE SOURCE OF TRUTH):
 MILESTONE SCALING & QUALITY RULES:
 - NO GENERIC TITLES: Titles must be highly specific technical objectives (e.g., "Master Python for OSINT" or "Complete HTB Defensive Track" instead of "Cybersecurity Fundamentals").
 - DO NOT PAD: Assess the complexity of the user's goal. Generate between 3 to 7 milestones accordingly. If a near-term goal requires 3 concrete steps, output exactly 3.
-- ADVANCED TRANSITIONS: Use 5 to 7 steps for complex transitions (like 1D7 to 1B4). Every single step MUST have a direct, actionable technical requirement (e.g., OS internals, Python/C scripting, advanced DCO/OCO concepts, or EDPT preparation).
+- ADVANCED TRANSITIONS: Use 5 to 7 steps for complex transitions (like 1D7 to 1B4). Every single step MUST have a direct, actionable technical requirement (e.g., OS internals, Python/C scripting, advanced DCO/OCO concepts, and so on).
 - The last step should always be the final certification, assessment, or milestone required to achieve the goal.
 
 OUTPUT FORMAT:
