@@ -138,10 +138,10 @@ def predict():
 
       return jsonify(parsed_response)
        
-    except Exception as e:
-        # Return the exact exception message in the response
-        print(f"ERROR DETAILS: {str(e)}")
-        return jsonify({"error": str(e), "type": type(e).__name__}), 500
+   except Exception as e:
+      # Return the exact exception message in the response
+      print(f"ERROR DETAILS: {str(e)}")
+      return jsonify({"error": str(e), "type": type(e).__name__}), 500
 
 # =======================================================
 # ROUTE 2: INSTRUCTOR PORTAL (CLOSED BOOK MTP)
@@ -190,9 +190,9 @@ def mtp_chat():
         return jsonify(parsed_response)
        
     except Exception as e:
-        # Return the exact exception message in the response
-        print(f"ERROR DETAILS: {str(e)}")
-        return jsonify({"error": str(e), "type": type(e).__name__}), 500
+       # Return the exact exception message in the response
+       print(f"ERROR DETAILS: {str(e)}")
+       return jsonify({"error": str(e), "type": type(e).__name__}), 500
 
 
 # =======================================================
@@ -242,9 +242,9 @@ def tutor_chat():
         return jsonify(parsed_response)
        
     except Exception as e:
-        # Return the exact exception message in the response
-        print(f"ERROR DETAILS: {str(e)}")
-        return jsonify({"error": str(e), "type": type(e).__name__}), 500
+       # Return the exact exception message in the response
+       print(f"ERROR DETAILS: {str(e)}")
+       return jsonify({"error": str(e), "type": type(e).__name__}), 500
 
 # =======================================================
 # STATUS
