@@ -119,8 +119,17 @@ def predict():
             max_tokens=2048,
             response_format={"type": "json_object"} 
         )
+       
         raw_text = completion.choices[0].message.content.strip()
-        parsed_response = json.loads(raw_text)
+       
+        if raw_text.startswith("```"):
+            raw_text = raw_text.split("\n", 1)[-1]
+        if raw_text.endswith("```"):
+            raw_text = raw_text.rsplit("\n", 1)[0]
+        if raw_text.startswith("json"):
+            raw_text = raw_text[4:].strip()
+
+        parsed_response = json.loads(raw_text.strip())
         
         if "learning_path" not in parsed_response:
             parsed_response["learning_path"] = []
@@ -128,11 +137,11 @@ def predict():
             parsed_response["assistant_message"] = "I have updated your roadmap based on our conversation."
 
         return jsonify(parsed_response)
+       
     except Exception as e:
         # Return the exact exception message in the response
         print(f"ERROR DETAILS: {str(e)}")
         return jsonify({"error": str(e), "type": type(e).__name__}), 500
-
 
 # =======================================================
 # ROUTE 2: INSTRUCTOR PORTAL (CLOSED BOOK MTP)
@@ -166,8 +175,20 @@ def mtp_chat():
             max_tokens=2048,
             response_format={"type": "json_object"} 
         )
+       
         raw_text = completion.choices[0].message.content.strip()
+
+        if raw_text.startswith("```"):
+            raw_text = raw_text.split("\n", 1)[-1]
+        if raw_text.endswith("```"):
+            raw_text = raw_text.rsplit("\n", 1)[0]
+        if raw_text.startswith("json"):
+            raw_text = raw_text[4:].strip()
+
+        parsed_response = json.loads(raw_text.strip())
+       
         return jsonify(json.loads(raw_text))
+       
     except Exception as e:
         # Return the exact exception message in the response
         print(f"ERROR DETAILS: {str(e)}")
@@ -206,13 +227,24 @@ def tutor_chat():
             max_tokens=2048,
             response_format={"type": "json_object"} 
         )
+       
         raw_text = completion.choices[0].message.content.strip()
+
+        if raw_text.startswith("```"):
+            raw_text = raw_text.split("\n", 1)[-1]
+        if raw_text.endswith("```"):
+            raw_text = raw_text.rsplit("\n", 1)[0]
+        if raw_text.startswith("json"):
+            raw_text = raw_text[4:].strip()
+
+        parsed_response = json.loads(raw_text.strip())
+       
         return jsonify(json.loads(raw_text))
+       
     except Exception as e:
         # Return the exact exception message in the response
         print(f"ERROR DETAILS: {str(e)}")
         return jsonify({"error": str(e), "type": type(e).__name__}), 500
-
 
 # =======================================================
 # STATUS
