@@ -88,55 +88,55 @@ Output only the JSON object. No preamble, no markdown."""
 # =======================================================
 @app.route('/run/predict', methods=['POST', 'OPTIONS'])
 def predict():
-    if request.method == 'OPTIONS':
-        response = make_response()
-        response.headers['Access-Control-Allow-Origin'] = 'https://project-nexus-hq.github.io'
-        response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
-        response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
-        return response, 200
+   if request.method == 'OPTIONS':
+      response = make_response()
+      response.headers['Access-Control-Allow-Origin'] = 'https://project-nexus-hq.github.io'
+      response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+      response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+      return response, 200
 
-    data = request.get_json()
-    chat_history = data.get('chatHistory', [])
-    mission_profile = data.get('missionProfile', {})
+   data = request.get_json()
+   chat_history = data.get('chatHistory', [])
+   mission_profile = data.get('missionProfile', {})
     
-    profile_context = f"""
-    --- USER MISSION PROFILE ---
-    Current Clearance: {mission_profile.get('clearanceLevel', 'Unclassified')}
-    Certifications Held: {", ".join(mission_profile.get('currentCertifications', [])) or 'None'}
-    Unit Context: {mission_profile.get('localContextSop', 'None provided.')}
-    """
+   profile_context = f"""
+   --- USER MISSION PROFILE ---
+   Current Clearance: {mission_profile.get('clearanceLevel', 'Unclassified')}
+   Certifications Held: {", ".join(mission_profile.get('currentCertifications', [])) or 'None'}
+   Unit Context: {mission_profile.get('localContextSop', 'None provided.')}
+   """
 
-    messages = [{"role": "system", "content": f"{SYSTEM_PROMPT}\n\n{profile_context}"}]
+   messages = [{"role": "system", "content": f"{SYSTEM_PROMPT}\n\n{profile_context}"}]
     
-    for msg in chat_history:
-        messages.append({"role": msg["role"], "content": msg["content"]})
+   for msg in chat_history:
+      messages.append({"role": msg["role"], "content": msg["content"]})
 
-    try:
-        completion = client.chat.completions.create(
-            model="llama-3.1-8b-instant",
-            messages=messages,
-            temperature=0.6,
-            max_tokens=2048,
-            response_format={"type": "json_object"} 
-        )
+   try:
+      completion = client.chat.completions.create(
+         model="llama-3.1-8b-instant",
+         messages=messages,
+         temperature=0.6,
+         max_tokens=2048,
+         response_format={"type": "json_object"} 
+      )
        
-        raw_text = completion.choices[0].message.content.strip()
+      raw_text = completion.choices[0].message.content.strip()
        
-        if raw_text.startswith("```"):
-            raw_text = raw_text.split("\n", 1)[-1]
-        if raw_text.endswith("```"):
-            raw_text = raw_text.rsplit("\n", 1)[0]
-        if raw_text.startswith("json"):
-            raw_text = raw_text[4:].strip()
+      if raw_text.startswith("```"):
+         raw_text = raw_text.split("\n", 1)[-1]
+      if raw_text.endswith("```"):
+         raw_text = raw_text.rsplit("\n", 1)[0]
+      if raw_text.startswith("json"):
+         raw_text = raw_text[4:].strip()
 
-        parsed_response = json.loads(raw_text.strip())
+      parsed_response = json.loads(raw_text.strip())
         
-        if "learning_path" not in parsed_response:
-            parsed_response["learning_path"] = []
-        if "assistant_message" not in parsed_response:
-            parsed_response["assistant_message"] = "I have updated your roadmap based on our conversation."
+      if "learning_path" not in parsed_response:
+         parsed_response["learning_path"] = []
+      if "assistant_message" not in parsed_response:
+         parsed_response["assistant_message"] = "I have updated your roadmap based on our conversation."
 
-        return jsonify(parsed_response)
+      return jsonify(parsed_response)
        
     except Exception as e:
         # Return the exact exception message in the response
@@ -187,7 +187,7 @@ def mtp_chat():
 
         parsed_response = json.loads(raw_text.strip())
        
-        return jsonify(json.loads(raw_text))
+        return jsonify(parsed_response)
        
     except Exception as e:
         # Return the exact exception message in the response
@@ -239,7 +239,7 @@ def tutor_chat():
 
         parsed_response = json.loads(raw_text.strip())
        
-        return jsonify(json.loads(raw_text))
+        return jsonify(parsed_response)
        
     except Exception as e:
         # Return the exact exception message in the response
