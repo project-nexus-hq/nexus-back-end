@@ -129,7 +129,9 @@ def predict():
 
         return jsonify(parsed_response)
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        # Return the exact exception message in the response
+        print(f"ERROR DETAILS: {str(e)}")
+        return jsonify({"error": str(e), "type": type(e).__name__}), 500
 
 
 # =======================================================
@@ -167,7 +169,9 @@ def mtp_chat():
         raw_text = completion.choices[0].message.content.strip()
         return jsonify(json.loads(raw_text))
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        # Return the exact exception message in the response
+        print(f"ERROR DETAILS: {str(e)}")
+        return jsonify({"error": str(e), "type": type(e).__name__}), 500
 
 
 # =======================================================
@@ -205,7 +209,9 @@ def tutor_chat():
         raw_text = completion.choices[0].message.content.strip()
         return jsonify(json.loads(raw_text))
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        # Return the exact exception message in the response
+        print(f"ERROR DETAILS: {str(e)}")
+        return jsonify({"error": str(e), "type": type(e).__name__}), 500
 
 
 # =======================================================
