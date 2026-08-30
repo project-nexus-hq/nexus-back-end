@@ -113,7 +113,7 @@ def predict():
 
     try:
         completion = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="qwen-3.6-27b",
             messages=messages,
             temperature=0.6,
             max_tokens=2048,
@@ -158,7 +158,7 @@ def mtp_chat():
 
     try:
         completion = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="qwen-3.6-27b",
             messages=messages,
             temperature=0.1,
             max_tokens=2048,
@@ -196,7 +196,7 @@ def tutor_chat():
 
     try:
         completion = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="qwen-3.6-27b",
             messages=messages,
             temperature=0.4, # Mid-level temp for Socratic creativity
             max_tokens=2048,
